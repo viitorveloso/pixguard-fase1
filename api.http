@@ -1,0 +1,81 @@
+### pixledger — requisições de exemplo (VS Code REST Client)
+### Gere um token: make token  (ou: go run ./cmd/tokengen -sub dev -ttl 24h)
+
+@baseUrl = http://localhost:8080
+@token = COLE_SEU_TOKEN_AQUI
+
+### Health (liveness)
+GET {{baseUrl}}/healthz
+
+### Readiness (checa o Postgres)
+GET {{baseUrl}}/readyz
+
+### Métricas Prometheus
+GET {{baseUrl}}/metrics
+
+### Criar conta origem
+POST {{baseUrl}}/api/accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "number": "0001-1",
+  "holder": "Lucas",
+  "initial_balance_cents": 100000
+}
+
+### Criar conta destino
+POST {{baseUrl}}/api/accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "number": "0002-2",
+  "holder": "Maria",
+  "initial_balance_cents": 0
+}
+
+### Consultar conta (troque o UUID)
+GET {{baseUrl}}/api/accounts/COLOQUE_O_UUID_AQUI
+Authorization: Bearer {{token}}
+
+### Pix — primeira execução (201)
+### Repita a MESMA requisição: volta 200 + Idempotent-Replayed: true,
+### com o mesmo transaction_id, sem debitar de novo.
+POST {{baseUrl}}/api/pix
+Authorization: Bearer {{token}}
+Content-Type: application/json
+X-Idempotency-Key: pedido-123
+
+{
+  "source_account_id": "UUID_DA_ORIGEM",
+  "dest_account_id": "UUID_DO_DESTINO",
+  "amount_cents": 2500,
+  "description": "almoço"
+}
+
+### Pix — mesma chave, payload diferente (409 idempotency_conflict)
+POST {{baseUrl}}/api/pix
+Authorization: Bearer {{token}}
+Content-Type: application/json
+X-Idempotency-Key: pedido-123
+
+{
+  "source_account_id": "UUID_DA_ORIGEM",
+  "dest_account_id": "UUID_DO_DESTINO",
+  "amount_cents": 9999,
+  "description": "almoço"
+}
+
+### Pix — saldo insuficiente (402 gravado; replay devolve o mesmo 402)
+POST {{baseUrl}}/api/pix
+Authorization: Bearer {{token}}
+Content-Type: application/json
+X-Idempotency-Key: pedido-sem-saldo
+
+{
+  "source_account_id": "UUID_DA_ORIGEM",
+  "dest_account_id": "UUID_DO_DESTINO",
+  "amount_cents": 99999999,
+  "description": "acima do saldo"
+}
